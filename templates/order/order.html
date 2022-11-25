@@ -56,9 +56,17 @@
                                 <span class="text">결제금액</span>
                             </h4>
                             <ul class="list-group mb-3">
+                                {% for key, value in dic.items() %}
+                            {% if value!=0%}
                                 <li class="list-group-item d-flex justify-content-between lh-sm">
-                                    <span>총 결제금액</span>
-                                    <strong>{{totalPrice}}원</strong>
+                                    <span>{{key}}</span>
+                                    <strong>{{value}}원</strong>
+                                </li>
+                                {% endif %}
+                            {% endfor %}
+                                <li class="list-group-item d-flex justify-content-between lh-sm">
+                                    <h5><span>총 결제금액</span></h5>
+                                    <h4><strong>{{totalprice}}원</strong></h4>
                                 </li>
                             </ul>
                             <div class="input-group">
@@ -73,7 +81,7 @@
                                 <label for="username" class="form-label">ID</label>
                                 <div class="input-group has-validation">
                                     <input type="text" class="form-control" name="userID" id="username"
-                                           placeholder="{{logininfo}}" aria-label="Disabled input example">
+                                           placeholder="{{logininfo}}" aria-label="Disabled input example" disabled>
                                 </div>
                             </div>
                             <div class="col-12">

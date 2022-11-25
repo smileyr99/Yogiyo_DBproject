@@ -6,7 +6,6 @@ app = Flask(__name__)
 app.secret_key = 'sample_secret'
 
 menulist = list()
-menu_no=0
 
 def connectsql():
     conn = pymysql.connect(host='127.0.0.1', user='root', passwd='didhd1', db='dbProject', charset='utf8')
@@ -80,7 +79,6 @@ def login():
         data = cursor.fetchall()
         cursor.close()
         conn.close()
-
         for row in data:
             data = row[0]
 
@@ -179,22 +177,49 @@ def mypage_order_list():
         conn = connectsql()
         cursor = conn.cursor()
         userId = session['userId']
-        query = "select distinct L.restaurant_name, O.order_date, O.total_price, O.method_of_payment, O.delivery_address, O.requests from Order_ as O, Order_list as L where O.order_number=L.order_number and L.ID=%s;"
+        query = "select distinct L.restaurant_name, O.order_date, O.total_price, O.method_of_payment, O.delivery_address, O.requests, O.order_number from Order_ as O, Order_list as L where O.order_number=L.order_number and L.ID=%s;"
         cursor.execute(query, userId)
         tmp = cursor.fetchall()
         order_list = [list(row) for row in tmp]
         cursor.execute(query, userId)
+        print(order_list)
+
+        menu_list=[]
+        tmp1_list=[]
+        tmp2_list = []
+        for row in order_list:
+            order_number = row[6]
+            query = "select menu_name, count from Order_list where order_number=%s"
+            cursor.execute(query, order_number)
+            tmp = cursor.fetchall()
+            for row in tmp:
+                tmp1_list.append(row[0]+" "+str(row[1])+"개")
+                print(tmp1_list)
+            tmp2_list.append(tmp1_list)
+            tmp1_list=[]
+        print(tmp2_list)
+
+        for row in tmp2_list:
+            s = '/  '.join(row)
+            menu_list.append(s)
+            print(menu_list)
+
+        for i in range(len(order_list)):
+            order_list[i].append(menu_list[i])
+
+        print(menu_list)
+
         query = "select user_name from user_list where ID=%s"
         cursor.execute(query, userId)
         data = cursor.fetchall()
-
+        print(order_list)
         for row in data:
             nickname = row[0]
 
         cursor.close()
         conn.close()
 
-        return render_template('mypage_order_list.html', logininfo=nickname, orderlist=order_list)
+        return render_template('mypage_order_list.html', logininfo=nickname, orderlist=order_list, menulist = menu_list)
 
 
 @app.route('/detail/<restaurant_name>', methods=['GET', 'POST'])
@@ -204,10 +229,11 @@ def detail(restaurant_name):
 
         conn = connectsql()
         cursor = conn.cursor()
-        query = " select menu_name, introduction, price, photo from Menu where restaurant_name=%s;"
+        query = "select * from menu where restaurant_name = %s"
         value = restaurant_name
         cursor.execute(query, value)
         data_list = cursor.fetchall()
+        print(data_list)
         cursor.close()
         conn.close()
 
@@ -233,16 +259,23 @@ def order(restaurant_name):
             cursor.close()
             conn.close()
 
+            menuList = []
+            for menu in menu_list:
+                menuList.append(menu[0])
+            print(menuList[0])
+
+
             priceList = []
             for price in price_list:
                 priceList.append(price[0])
             print(priceList[0])
-            total_price = 0
+            total_price = []
 
             for i in range(len(menu_list)):
-                if menuCnt[i] != 0:
-                    total_price += priceList[i] * int(menuCnt[i])
+                total_price.append(priceList[i] * int(menuCnt[i]))
             print(total_price)
+
+            dic = dict(zip(menuList, total_price))
 
             now = datetime.datetime.now()
             now_date = now.strftime("%Y{} %m{} %d{} %H{}%M{}%S")
@@ -251,7 +284,7 @@ def order(restaurant_name):
             conn = connectsql()
             cursor = conn.cursor()
             query = "INSERT INTO Order_ (order_number,ID, order_date , total_price) values (%s, %s, %s, %s)"
-            value = (order_number, userId, now_date, total_price)
+            value = (order_number, userId, now_date, sum(total_price))
             cursor.execute(query, value)
             lst = cursor.fetchall()
             print(lst)
@@ -260,18 +293,18 @@ def order(restaurant_name):
             conn.close()
 
             for i in range(len(menuCnt)):
+                if menuCnt[i] == '0':
+                    continue
                 conn = connectsql()
                 cursor = conn.cursor()
-                query = "INSERT INTO Order_list ( order_number, restaurant_name, menu_name, ID, count) values ( %s, %s, %s, %s, %s)"
+                query = "INSERT INTO Order_list (order_number, restaurant_name, menu_name, ID, count) values ( %s, %s, %s, %s, %s)"
                 value = (order_number, restaurant_name, menu_list[i], userId, menuCnt[i])
                 cursor.execute(query, value)
-                order_list = cursor.fetchall()
-                print(order_list)
                 conn.commit()
                 cursor.close()
                 conn.close()
 
-            return render_template('./order/order.html', logininfo=userId, ordernumber=order_number, totalPrice=total_price)
+            return render_template('./order/order.html', logininfo=userId, ordernumber=order_number, totalprice=sum(total_price), dic=dic)
         else:
             return render_template('./login/login.html')
     else:
@@ -282,7 +315,6 @@ def order(restaurant_name):
 def payment(order_number):
     if 'userId' in session:
         userId = session['userId']
-
         conn = connectsql()
         cursor = conn.cursor()
         query = "select total_price from Order_ where order_number=%s"
@@ -303,7 +335,6 @@ def payment(order_number):
             conn = connectsql()
             cursor = conn.cursor()
             query = "UPDATE  Order_ SET method_of_payment = %s, requests = %s, delivery_address= %s where order_number = %s;"
-            # total_price 임의로
             value = (paymentMethod, require, address, order_number)
             cursor.execute(query, value)
             conn.commit()
